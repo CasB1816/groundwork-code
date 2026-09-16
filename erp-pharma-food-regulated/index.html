@@ -20,10 +20,10 @@
 <p class="eyebrow">Source code · US · EU</p>
 <h1>Pharma Batch Release &amp; Deviation Control (US/EU GMP)</h1>
 <p class="promise">Standalone batch release and deviation control that keeps a batch from shipping while anything is still open.</p>
-<div class="actions"><a class="btn btn-primary" href="https://pharma-batch-demo.onrender.com/" rel="noopener" target="_blank">Open the live demo</a><a class="btn btn-ghost" href="#rests">What it rests on</a></div>
+<div class="actions"><a class="btn btn-primary" href="https://pharma-batch-demo.onrender.com/" rel="noopener" target="_blank">Open the live demo</a><a class="btn btn-ghost" href="#rests">What it rests on</a><a class="btn btn-ghost" href="#price">Pricing</a></div>
 <p class="note">The demo runs on a free server and sleeps when idle, so the first load takes about a minute. Its data is wiped regularly.</p>
 <div class="signin"><p class="eyebrow">Sign in to the demo</p><p>Password for every account: <code>Demo-wachtwoord-1</code></p><ul><li><code>operator1</code> <span>Operator/Productie</span></li><li><code>qamanager1</code> <span>QA Manager</span></li><li><code>qahead1</code> <span>QA head / QP</span></li><li><code>qareviewer1</code> <span>QA reviewer</span></li><li><code>qp1</code> <span>Qualified Person (QP)</span></li><li><code>qa1</code> <span>Quality Assurance (QA)</span></li><li><code>qc1</code> <span>Quality Control (QC)</span></li><li><code>supervisor1</code> <span>Supervisor</span></li><li><code>demo</code></li></ul></div>
-<dl class="record"><div><dt>Released</dt><dd>2026-09-16</dd></div><div><dt>Jurisdictions</dt><dd>US, EU</dd></div><div><dt>Rules implemented</dt><dd>27</dd></div><div><dt>Process chains</dt><dd>6</dd></div></dl></header>
+<dl class="record"><div><dt>Released</dt><dd>2026-09-16</dd></div><div><dt>Jurisdictions</dt><dd>US, EU</dd></div><div><dt>Rules implemented</dt><dd>27</dd></div><div><dt>Process chains</dt><dd>6</dd></div><div><dt>Known limitations</dt><dd><a href="#limits">1</a></dd></div></dl></header>
 <figure class="beeld"><img src="screenshots/product.png" alt="The application, signed in" loading="lazy"><figcaption>The interface is deliberately plain. This is a reference implementation you extend, not a finished product — the work sits in the rules it enforces.</figcaption></figure>
 <section><h2>What it does</h2><div class="col">
 <p>This is source code that runs the fixed route of a manufacturing batch from draft to release or rejection, under US 21 CFR Part 11 and EU Annex 11 rules. It holds the Electronic Batch Record, the Batch Release Record, deviations, CAPAs and OOS investigations as separate but linked state machines, each with its own transitions and its own conditions for moving forward. Every signed step records a printed name, a date and time, and the meaning of the signature. Once a record is released it becomes immutable.</p>
@@ -71,7 +71,7 @@
 <tr><td class="rolename">QA Manager</td><td>Performs the final verification and releases the EBR (which then becomes immutable) or rejects it with an electronic signature.</td></tr>
 <tr><td class="rolename">Qualified Person (QP)</td><td>Certifies the release of batches for the EU market by electronic signature.</td></tr>
 </tbody></table></div></section>
-<section><h2>What this is not</h2><div class="limits">
+<section id="limits"><h2>What this is not</h2><div class="limits">
 <p>This system has not been validated for GxP use. It ships with no computer system validation package, no installation, operational or performance qualification, no supplier audit, and no approval from any regulatory body. In a regulated environment, validation is the responsibility of the licence holder and is carried out against your own processes and your own risk assessment; it cannot be handed over with a piece of software. This is a starting point that implements documented rules — not a compliant system. Treat it as code you own and must qualify, not as a system you can put into production as delivered.</p>
 <p>The rules were drawn from 62 business rules examined, of which 34 were in scope and implemented. Those 34 come from cited US and EU sources: 6 US rules across 6 jurisdictional rules and 5 EU rules, sourced from eCFR, the EU Annex 11 text, GMP SOP references and industry writeups. This covers the release, deviation, CAPA and OOS flows described above and nothing beyond them. Anything outside these 34 rules — other GMP processes, other record types, other jurisdictions — is not in this code.</p>
 <p>The database layer uses Node&#x27;s built-in SQLite module, which is still marked experimental and prints a warning on every start. Fine for a reference implementation; you will likely want to swap it before production.</p>
@@ -113,6 +113,7 @@
 <div class="tier"><p class="eyebrow">Single project</p><div class="amount">$600</div><p>Use this code in one system, for yourself or for one client.</p></div>
 <div class="tier"><p class="eyebrow">Unlimited</p><div class="amount">$1,500</div><p>Use it in as many systems as you like, for yourself or for clients.</p></div>
 </div>
+<p class="note"><a href="#limits">Read what this is not</a> before you buy: 1 known limitation, weighed and accepted.</p>
 <p class="shortly"><strong>Checkout opens shortly.</strong> To buy now, or to ask anything first, write to <a href="mailto:groundworkcode@outlook.com">groundworkcode@outlook.com</a>.</p>
 <p class="note">You may not resell this as source code, in whole or in substantial part, modified or not. What you build with it is yours to sell. The full licence ships with the archive.</p></section>
 </div>
