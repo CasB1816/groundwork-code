@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fulfilment Control for Multi-Vendor Marketplaces</title>
+<meta name="description" content="Order-fulfilment source code for marketplaces where one customer order splits across multiple vendors.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+<link rel="stylesheet" href="../stijl.css">
+</head>
+<body>
+<div class="bar"><div class="wrap">
+  <a href="../">Groundwork Code</a>
+  <nav><a href="https://groundwork-fulfilment-demo.onrender.com/" rel="noopener">Live demo</a><a href="../about/">About this shop</a></nav>
+</div></div>
+
+<div class="wrap"><header class="masthead">
+<p class="eyebrow">Source code</p>
+<h1>Fulfilment Control for Multi-Vendor Marketplaces</h1>
+<p class="promise">Order-fulfilment source code for marketplaces where one customer order splits across multiple vendors.</p>
+<div class="actions"><a class="btn btn-primary" href="https://groundwork-fulfilment-demo.onrender.com/" rel="noopener" target="_blank">Open the live demo</a><a class="btn btn-ghost" href="#rests">What it rests on</a></div>
+<p class="note">The demo runs on a free server and sleeps when idle, so the first load takes about a minute. Its data is wiped regularly.</p>
+<div class="signin"><p class="eyebrow">Sign in to the demo</p><p>Password for every account: <code>Demo-wachtwoord-1</code></p><ul><li><code>demo</code> <span>Admin (superuser)</span></li><li><code>cs</code> <span>Customer service / Staff</span></li><li><code>merchant</code> <span>Merchant (marketplace owner)</span></li><li><code>ops</code> <span>Operations / warehouse</span></li><li><code>staff</code> <span>Staff</span></li><li><code>globexvendor</code> <span>Vendor</span></li></ul></div>
+<dl class="record"><div><dt>Released</dt><dd>2026-09-04</dd></div><div><dt>Rules implemented</dt><dd>16</dd></div><div><dt>Process chains</dt><dd>6</dd></div></dl></header>
+<figure class="beeld"><img src="screenshots/product.png" alt="The application, signed in" loading="lazy"><figcaption>The interface is deliberately plain. This is a reference implementation you extend, not a finished product — the work sits in the rules it enforces.</figcaption></figure>
+<section><h2>What it does</h2><div class="col">
+<p>This is the operational core for a multi-vendor marketplace: the part that takes a single customer order, splits it per vendor, and tracks each portion through its own fulfilment lifecycle. When an order contains items from more than one vendor, the system creates a separate order split for each, so a vendor sees and works only their own lines. It moves orders and splits through documented states — from scheduled and unfulfilled, through in_fulfillment, partial and full fulfilment, hold, cancellation and restock — and records who acted at each transition from the session, not from the request body.</p>
+<p>It calculates shipping cost itself: billable weight is the greater of actual and dimensional weight, and DIM weight is derived from package dimensions and a divisor. It is not wired to a carrier — it computes a figure, it does not buy a label or look up tracking. Where most of the value sits is in what it will not let through: a fulfilment cannot be marked without a shipment record carrying a tracking number, and a cancellation before shipment voids the associated pick task instead of leaving a box to go out the door.</p>
+</div></section>
+<section><h2>The 6 process chains</h2><p class="lede">Each chain is a route a record travels. What matters as much as what it does is what it refuses — those refusals are wired into the state transitions, not offered as guidance.</p>
+<article class="flow"><div class="flow-head"><span class="fid">F1</span><h3>Approving vendors before access</h3></div>
+<div class="roles"><span class="role">Staff</span></div>
+<p>A staff member reviews a vendor registration and approves it. Until that approval, the vendor account exists but cannot log in. On approval, the system records the approving staff member&#x27;s name from the session, and once live the vendor manages only their own order lines after a split.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>Login fails while a vendor is still registered; it succeeds only after a staff member approves.</li><li>approved_by_name is set to the logged-in staff member even when the request body sends a different name.</li><li>A vendor attempting product approval receives 403; a merchant receives 200.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F2</span><h3>Approving products for the storefront</h3></div>
+<div class="roles"><span class="role">Merchant</span></div>
+<p>A vendor submits a product, and it stays out of the storefront until the merchant approves it. The merchant controls what goes live. On approval the approving identity is taken from the session. The same flow covers the shipping-cost calculation the product data feeds into.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>approved_by_name is the merchant from the session even when the body carries a different name.</li><li>For a 12×12×12 package with divisor 139, DIM rounds to 13: with actual weight 5 the billable weight is 13, with actual weight 20 it is 20.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F3</span><h3>Driving the order lifecycle</h3></div>
+<div class="roles"><span class="role">Systeem</span><span class="role">Operations / warehouse</span><span class="role">Operations / Staff</span><span class="role">Customer service / Staff</span><span class="role">Systeem / warehouse</span></div>
+<p>The system advances an order through its states: it becomes unfulfilled when the fulfillment date is reached, moves to in_fulfillment while a warehouse picks and packs, and reaches partially_fulfilled or fulfilled as line items ship. Staff can place an order on hold and release it back to unfulfilled. Customer service can cancel before shipment, and cancelled orders move to restocked once every item is returned to available inventory.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>A hold blocks fulfilment until released; inventory can remain reserved during the hold.</li><li>Cancellation before shipment must void the associated pick task rather than leave a shipment to proceed.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F4</span><h3>Splitting orders by vendor</h3></div>
+<div class="roles"><span class="role">Systeem</span></div>
+<p>When a received order contains products from more than one vendor, the system splits it automatically into one order split per vendor. Each vendor then sees only their portion. An order with items from a single vendor is not split.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>An order with items from two vendors produces two order_splits and split_status split; an order with one vendor produces no split.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F5</span><h3>Fulfilling each vendor split</h3></div>
+<div class="roles"><span class="role">Operations / warehouse</span><span class="role">Customer service / Staff</span></div>
+<p>Each vendor split runs its own fulfilment lifecycle. The warehouse moves a split into in_fulfillment, then to partially_fulfilled as some lines ship and fulfilled once all lines of that split ship with a valid tracking number. If the order is cancelled before shipment, the corresponding split pick task is voided.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>Shipping part of a vendor split sets it to partially_fulfilled; shipping the rest sets it to fulfilled.</li><li>A split reaches fulfilled only when its lines ship with a valid tracking number — a fulfilment without a shipment record is not accepted.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F6</span><h3>Processing returns and restock</h3></div>
+<div class="roles"><span class="role">Operations / warehouse</span><span class="role">Staff</span></div>
+<p>Operations record a requested return as received once the physical goods arrive, then move it to restocked when the returned quantities are put back into available inventory. Staff can reject a requested return. Restock and rejection are gated on permissions, and the acting identity is recorded from the session.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>A user without can_restock receives 403 when attempting a restock.</li><li>A user without the required permission receives 403 when rejecting an RMA.</li><li>On restock, available_qty increases by the returned quantity, restocked is set, and processed_by_name is the logged-in user.</li></ul></div>
+</article>
+</section>
+<section><h2>Who uses it</h2><p class="lede">Roles as the source material names them, with what each one does in the system.</p><div class="scroll"><table><thead><tr><th>Role</th><th>Does</th></tr></thead><tbody>
+<tr><td class="rolename">Admin (superuser)</td><td>Runs the whole marketplace operation, sees every admin module and holds full rights over vendors, orders, shipping and returns.</td></tr>
+<tr><td class="rolename">Staff</td><td>Approves vendor registrations, manages products and orders, places orders on hold and releases holds, and cancels orders before shipment.</td></tr>
+<tr><td class="rolename">Merchant (marketplace owner)</td><td>Decides through approval which vendor products go live, and oversees the operation.</td></tr>
+<tr><td class="rolename">Vendor</td><td>Manages its own products, submits them for approval, and sees and handles its own order lines after an order is split.</td></tr>
+<tr><td class="rolename">Vendor staff</td><td>Works inside the vendor&#x27;s store with rights the vendor sets and can adjust.</td></tr>
+<tr><td class="rolename">Operations / warehouse</td><td>Carries out fulfilment: picking and packing, marking partial shipments, reporting orders as fulfilled per label with a tracking number, and restocking after a cancellation.</td></tr>
+<tr><td class="rolename">Customer service / Staff</td><td>Cancels orders before shipment and makes sure the matching pick task is voided.</td></tr>
+</tbody></table></div></section>
+<section><h2>What this is not</h2><div class="limits">
+<p>This system carries no certification, audit or approval of any kind. It calculates shipping cost but is not connected to any carrier: there is no label purchase, no negotiated rate and no tracking lookup — a tracking number is a value you record, not one this system obtains. It handles no payment data, so nothing here falls in PCI-DSS scope, and it stores no addresses, email addresses or phone numbers — a marketplace that adds those takes on data-protection obligations this code does not cover. It is not certified or approved by any marketplace platform, and nothing in it has been audited against a customs or export regime. This is a starting point that implements documented rules, not a compliant system.</p>
+<p>The rules here come from 17 business rules drawn from 42 that were examined, all 17 in scope. They are sourced from operational and marketplace documentation, not from a legal or regulatory standard, and the citations are English-language vendor and logistics references. This defines how far the implementation reaches: the state machine, the splitting logic and the shipment and cancellation guards. Anything beyond those rules is outside what this code does.</p>
+<p>The database layer uses Node&#x27;s built-in SQLite module, which is still marked experimental and prints a warning on every start. Fine for a reference implementation; you will likely want to swap it before production.</p>
+<p class="eyebrow">Known and accepted</p><ul class="accepted">
+<li><strong>Some screens (order detail, audit log) can be opened without signing in. They show no data.</strong> Opening a screen without a session yields nothing: all 15 read routes refuse a request without a token, and the app sends you back to the sign-in screen on a 401. What you see is an empty screen, not a data leak. Hiding those screens on the front end is an improvement, not a defect in the core promise; accepted for a prototype.</li>
+<li><strong>The shipments screen does not show which product a shipment is for: the table lists id, order, split, tracking number, weight, cost and who did it, but no product name.</strong> A shipment can cover several order lines of one order, so there is no single product to put in the table; the link runs through the order lines. A product column would be empty or misleading for an ordinary shipment. The tracking number is the carrier&#x27;s number — the proof that something actually left the building, which is the core of the promise — and since it is free text you can use it to recognise your own line. Showing the product on the shipment list is an improvement, not a defect in the core promise; accepted for a prototype.</li>
+<li><strong>The inventory screen shows only a product id, not a product name or SKU, so you need to know the ids to tell which stock line belongs to which product.</strong> Same kind as the shipments screen, and the same weighing: awkward to read, but it does not touch the core promise and blocks nothing. The lesson is recorded for the pipeline: a list screen should carry a recognisable column.</li>
+<li><strong>The acceptance tests are written in Dutch, while the rest of the application is English.</strong> The three tests added during the review are in English; the thirteen acceptance tests from the build remain Dutch. Translating them by hand would touch the frozen test suite this release rests on, and a translation is not a functional improvement worth that risk. Accepted for this product; for the next products it is fixed at the source.</li>
+<li><strong>The order detail screen shows buttons the signed-in user is not allowed to use: an operations user sees &#x27;Release hold&#x27; and gets &#x27;insufficient permissions&#x27; when clicking it.</strong> Left as is (decision of 2 September 2026). The screen derives its buttons from the status of the order, not from the rights of the signed-in user; both are needed to know what someone may do. The server refuses correctly with a 403 and a readable message, so nothing goes wrong — it costs a user one click to find out they lack the right. Hiding buttons per right is an improvement, not a defect in the core promise.</li>
+<li><strong></strong> Two API routes have no screen: GET /api/roles and POST /api/users would need a user-management screen that was never specified. Neither touches the core promise. The three return routes that the automated check could not assess are used: in the running app Receive, Reject and Restock were clicked and the return moved from requested to received to restocked.</li>
+<li><strong></strong> Shipment lines can only be seen through their shipment (GET /api/shipments/:id), not as a list of their own — outside their shipment they have no meaning. Return RMAs do have their own list (GET /api/returns) and the returns screen shows them.</li>
+<li><strong></strong> Weighed per field: name, SKU, dimensions, weight, customer name, order reference, order and order-line ids and quantity are known at creation and belong there. Only the scheduled date of an order might change later (rescheduling); that is an extension, not a defect.</li>
+<li><strong>A handful of source files use Dutch names and comments: 6 of the 44 source files outside the tests, mostly the server bootstrap, the seed and the API client. The user interface and the API are English.</strong> Accepted as is: it is confined to a few files and does not affect how the system runs. You may come across some Dutch when you read the bootstrap code. The price is unchanged.</li>
+</ul>
+</div></section>
+<section id="rests"><h2>What it rests on</h2><p class="lede">16 rules the system implements, quoted from the material they were taken from. Each one carries its reference and its source in the archive, next to the module, the check and the test that enforce it. The reference in grey is the identifier the code and tests use; it comes from a larger catalogue of rules, so the numbers are not consecutive.</p><div class="scroll"><table><thead><tr><th>#</th><th>Quoted from the source</th><th>Reference</th></tr></thead><tbody>
+<tr><td class="rid">1</td><td class="quote">“You will not be able to log into your account ... until a marketplace staff member approves”</td><td class="rid">BR-14</td></tr>
+<tr><td class="rid">2</td><td class="quote">“Vendors submit products for merchant approval. The merchant controls what goes live”</td><td class="rid">BR-15</td></tr>
+<tr><td class="rid">3</td><td class="quote">“A warehouse is picking and packing the order”</td><td class="rid">BR-16</td></tr>
+<tr><td class="rid">4</td><td class="quote">“at least one line item on the order has shipped and at least one has not”</td><td class="rid">BR-17</td></tr>
+<tr><td class="rid">5</td><td class="quote">“every item on the order has been packed, handed to a carrier, and recorded as shipped”</td><td class="rid">BR-18</td></tr>
+<tr><td class="rid">6</td><td class="quote">“Fulfillment is deliberately blocked. Inventory can still be reserved”</td><td class="rid">BR-19</td></tr>
+<tr><td class="rid">7</td><td class="quote">“cannot be fulfilled until the hold is released, at which point the status returns to Unfulfilled”</td><td class="rid">BR-20</td></tr>
+<tr><td class="rid">8</td><td class="quote">“until the fulfillment date is reached, at which point the order status updates to Unfulfilled”</td><td class="rid">BR-21</td></tr>
+<tr><td class="rid">9</td><td class="quote">“cancellation must void the pick task”</td><td class="rid">BR-22</td></tr>
+<tr><td class="rid">10</td><td class="quote">“all of the items on the order have been returned to available inventory”</td><td class="rid">BR-23</td></tr>
+<tr><td class="rid">11</td><td class="quote">“Shipturtle splits it automatically so each vendor sees only their portion”</td><td class="rid">BR-24</td></tr>
+<tr><td class="rid">12</td><td class="quote">“divide the cubic size of the package in inches by the DIM divisor to calculate the dimensional weight”</td><td class="rid">BR-31</td></tr>
+<tr><td class="rid">13</td><td class="quote">“the first shipment fires a confirmation email, the customer assumes the order is complete”</td><td class="rid">BR-34</td></tr>
+<tr><td class="rid">14</td><td class="quote">“marks an order Fulfilled without attaching a tracking number”</td><td class="rid">BR-35</td></tr>
+<tr><td class="rid">15</td><td class="quote">“A storefront cancellation that never voids the pick task produces a shipped box”</td><td class="rid">BR-36</td></tr>
+<tr><td class="rid">16</td><td class="quote">“orders split in ShipStation for Amazon ... will not update correctly on the selling channel”</td><td class="rid">BR-40</td></tr>
+</tbody></table></div>
+</section>
+<section id="price"><h2>Price</h2><p class="lede">Both tiers contain exactly the same code. The only difference is how often you may use it. Either way you sell what you build with it, not the code itself.</p><div class="tiers">
+<div class="tier"><p class="eyebrow">Single project</p><div class="amount">$1,000</div><p>Use this code in one system, for yourself or for one client.</p></div>
+<div class="tier"><p class="eyebrow">Unlimited</p><div class="amount">$2,500</div><p>Use it in as many systems as you like, for yourself or for clients.</p></div>
+</div>
+<p class="shortly"><strong>Checkout opens shortly.</strong> To buy now, or to ask anything first, write to <a href="mailto:groundworkcode@outlook.com">groundworkcode@outlook.com</a>.</p>
+<p class="note">You may not resell this as source code, in whole or in substantial part, modified or not. What you build with it is yours to sell. The full licence ships with the archive.</p></section>
+</div>
+<footer><div class="wrap">
+  <span>Fulfilment Control for Multi-Vendor Marketplaces</span>
+  <span>Generated 2026-09-16 from the release record. <a href="../about/">About this shop</a></span>
+</div></footer>
+</body>
+</html>

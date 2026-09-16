@@ -138,6 +138,8 @@ pre{font-family:var(--mono);font-size:13.5px;line-height:1.8;background:var(--ca
   font-variant-numeric:tabular-nums;line-height:1.1;margin:8px 0 10px}
 .tier p{font-size:14px;color:var(--muted);margin:0}
 .tier .btn{margin-top:18px}
+.shortly{margin:18px 0 0;padding:14px 18px;border:1px solid var(--hair-strong);
+  border-radius:2px;background:var(--card);font-size:15px;max-width:62ch}
 
 /* ---- catalogus ---- */
 .intro{padding:56px 0 44px;border-bottom:1px solid var(--hair)}

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pharma Batch Release &amp; Deviation Control (US/EU GMP)</title>
+<meta name="description" content="Standalone batch release and deviation control that keeps a batch from shipping while anything is still open.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap">
+<link rel="stylesheet" href="../stijl.css">
+</head>
+<body>
+<div class="bar"><div class="wrap">
+  <a href="../">Groundwork Code</a>
+  <nav><a href="https://pharma-batch-demo.onrender.com/" rel="noopener">Live demo</a><a href="../about/">About this shop</a></nav>
+</div></div>
+
+<div class="wrap"><header class="masthead">
+<p class="eyebrow">Source code · US · EU</p>
+<h1>Pharma Batch Release &amp; Deviation Control (US/EU GMP)</h1>
+<p class="promise">Standalone batch release and deviation control that keeps a batch from shipping while anything is still open.</p>
+<div class="actions"><a class="btn btn-primary" href="https://pharma-batch-demo.onrender.com/" rel="noopener" target="_blank">Open the live demo</a><a class="btn btn-ghost" href="#rests">What it rests on</a></div>
+<p class="note">The demo runs on a free server and sleeps when idle, so the first load takes about a minute. Its data is wiped regularly.</p>
+<div class="signin"><p class="eyebrow">Sign in to the demo</p><p>Password for every account: <code>Demo-wachtwoord-1</code></p><ul><li><code>operator1</code> <span>Operator/Productie</span></li><li><code>qamanager1</code> <span>QA Manager</span></li><li><code>qahead1</code> <span>QA head / QP</span></li><li><code>qareviewer1</code> <span>QA reviewer</span></li><li><code>qp1</code> <span>Qualified Person (QP)</span></li><li><code>qa1</code> <span>Quality Assurance (QA)</span></li><li><code>qc1</code> <span>Quality Control (QC)</span></li><li><code>supervisor1</code> <span>Supervisor</span></li><li><code>demo</code></li></ul></div>
+<dl class="record"><div><dt>Released</dt><dd>2026-09-16</dd></div><div><dt>Jurisdictions</dt><dd>US, EU</dd></div><div><dt>Rules implemented</dt><dd>27</dd></div><div><dt>Process chains</dt><dd>6</dd></div></dl></header>
+<figure class="beeld"><img src="screenshots/product.png" alt="The application, signed in" loading="lazy"><figcaption>The interface is deliberately plain. This is a reference implementation you extend, not a finished product — the work sits in the rules it enforces.</figcaption></figure>
+<section><h2>What it does</h2><div class="col">
+<p>This is source code that runs the fixed route of a manufacturing batch from draft to release or rejection, under US 21 CFR Part 11 and EU Annex 11 rules. It holds the Electronic Batch Record, the Batch Release Record, deviations, CAPAs and OOS investigations as separate but linked state machines, each with its own transitions and its own conditions for moving forward. Every signed step records a printed name, a date and time, and the meaning of the signature. Once a record is released it becomes immutable.</p>
+<p>The point of a system like this is not what it lets through but what it stops. A batch cannot reach Approved while a linked deviation or OOS is open. A record can only be edited while in Draft. A CAPA cannot be closed by its own owner. A correction to a released record cannot happen without a documented exception and QA approval, and every such change writes an audit trail entry with the old and new value. The rules are implemented from cited GMP sources; the enforcement is in the code, not in procedure.</p>
+</div></section>
+<section><h2>The 6 process chains</h2><p class="lede">Each chain is a route a record travels. What matters as much as what it does is what it refuses — those refusals are wired into the state transitions, not offered as guidance.</p>
+<article class="flow"><div class="flow-head"><span class="fid">F1</span><h3>Releasing the Electronic Batch Record</h3></div>
+<div class="roles"><span class="role">Supervisor</span><span class="role">QA Manager</span></div>
+<p>The EBR is filled in and editable only while in Draft. A Supervisor submits it for approval, or cancels it when it is not required, typically on QA comment. The QA Manager performs the final verification and either releases it with an electronic signature — at which point it becomes immutable and the releasing user and timestamp are recorded — or rejects it.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>Submission of an EBR carrying a critical manually entered value is blocked until a second review signature confirms the accuracy of that value.</li><li>Any correction to a released record is refused unless a documented exception with QA approval and the original content exist; when they do, the change succeeds and an audit trail entry is written.</li><li>The EBR cannot be edited outside Draft.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F2</span><h3>Approving the Batch Release Record</h3></div>
+<div class="roles"><span class="role">Operator/Productie of QA reviewer</span><span class="role">QA head / QP</span><span class="role">Quality Assurance (QA)</span></div>
+<p>Production or a QA reviewer submits the record, moving it from Draft to Under QA Review. From there the QA head or QP sets the disposition: Approved requires the BMR and CoA reviewed, no open deviation or OOS, and certification by electronic signature. QA can place the record On Hold while a linked deviation, OOS or investigation is open, and a rejection requires a disposition reason. A held record can only reach Approved once the linked OOS and deviation are closed and reviews are complete.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>Certification by anyone who is not a QP is refused; certification by a QP succeeds and fills certified_by_user_id and certified_at.</li><li>Approval with an open deviation or open OOS fails with an explicit message; it succeeds only once all are closed.</li><li>An operator cannot move a record to Approved; only the QA head or QP can, and QA can move it to On Hold.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F3</span><h3>Setting batch disposition from quarantine</h3></div>
+<div class="roles"><span class="role">Quality Assurance (QA)</span></div>
+<p>QA works the disposition on the batch release record out of Quarantine. A batch moves to Approved only when discrepancies are resolved, deviations investigated, and any required CAPA or change control is complete. It moves to Rejected when it does not match the recorded information or carries significant GMP deviations.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>Certification by anyone who is not a QP is refused; certification by a QP succeeds and fills certified_by_user_id and certified_at.</li><li>Approval with an open deviation or open OOS fails with an explicit message; it succeeds only once all are closed.</li><li>An operator cannot move a record to Approved; only the QA head or QP can, and QA can move it to On Hold.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F4</span><h3>Investigating and closing a deviation</h3></div>
+<div class="roles"><span class="role">Operator/Productie (Reporter) of Investigator</span><span class="role">Investigator/QA</span><span class="role">Quality Assurance (QA)</span><span class="role">Quality Assurance (QA) (Senior)</span></div>
+<p>A reporter or investigator moves a deviation from Open to Under Investigation with a description and a Minor/Major/Critical classification. Root cause and impact assessment are documented; a systemic cause requires a linked CAPA before it can move to CAPA Assigned. QA closes the deviation only after impact assessment, root cause, the linked CAPA milestone and any retraining are complete, approved with a Part 11 electronic signature. A critical deviation with direct impact on product quality or patient safety is placed On Hold by senior QA, quarantining the batch.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>A deviation with a systemic cause cannot move to CAPA Assigned without a linked CAPA.</li><li>A change to a deviation without a reason is refused; with a reason an audit trail entry is written with old_value and new_value.</li><li>A confirmed OOS without a linked deviation does not mark the batch releasable; with the link it does.</li><li>A late electronic signature on a critical check without an accompanying deviation is refused; with a deviation and evidence it is allowed.</li><li>Setting disposition to Approved while a deviation is still Under Investigation fails.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F5</span><h3>Verifying and closing a CAPA</h3></div>
+<div class="roles"><span class="role">Quality Assurance (QA)</span><span class="role">Quality Assurance (QA) (onafhankelijke reviewer)</span></div>
+<p>A CAPA is opened and executed by QA. Final closure is prevented until the effectiveness criteria and objective evidence are documented and approved. The verifying user must not be the owner: verified_by_user_id must differ from owner_user_id, and verified_at is set on closure. The In Progress step is an assumption; no explicit source rule covers that intermediate transition.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>A deviation with a systemic cause cannot move to CAPA Assigned without a linked CAPA.</li><li>An owner declaring the effectiveness of their own CAPA is refused; an independent QA reviewer succeeds.</li></ul></div>
+</article>
+<article class="flow"><div class="flow-head"><span class="fid">F6</span><h3>Running the OOS investigation</h3></div>
+<div class="roles"><span class="role">Quality Control (QC)</span><span class="role">Quality Assurance (QA)</span></div>
+<p>QC opens the investigation and runs Phase I: a laboratory check of calculation, instrument and dilution for an assignable cause. With no assignable lab cause, QA authorises a retest plan and the investigation moves to Phase II. QA closes it with a conclusion of confirmed or invalidated, root cause and manufacturing impact determined.</p>
+<div class="refuses"><p class="eyebrow">It refuses</p><ul><li>Approval with an open deviation or open OOS fails with an explicit message; it succeeds only once all are closed.</li><li>An OOS with conclusion=confirmed without a linked deviation does not mark the batch releasable; with the link it does.</li></ul></div>
+</article>
+</section>
+<section><h2>Who uses it</h2><p class="lede">Roles as the source material names them, with what each one does in the system.</p><div class="scroll"><table><thead><tr><th>Role</th><th>Does</th></tr></thead><tbody>
+<tr><td class="rolename">Operator/Productie</td><td>Fills in the electronic batch record contemporaneously, submits it and signs that it is complete and accurate; reports deviations that occur during manufacturing.</td></tr>
+<tr><td class="rolename">Supervisor</td><td>Submits the EBR for approval, or cancels it when it is not required on the basis of QA comment.</td></tr>
+<tr><td class="rolename">Quality Control (QC)</td><td>Performs analyses, records test results and opens the OOS investigation when a result falls outside specification.</td></tr>
+<tr><td class="rolename">QA reviewer</td><td>Moves the batch record to &#x27;Under QA Review&#x27; and assesses deviations and OOS investigations during the intermediate steps.</td></tr>
+<tr><td class="rolename">Quality Assurance (QA)</td><td>Performs the independent final review, sets the disposition, holds batches while a deviation or OOS is open, and enforces investigation and reassessed classification.</td></tr>
+<tr><td class="rolename">QA head / QP</td><td>Sets the final disposition to Approved (Released) or Rejected and certifies the release with an electronic signature.</td></tr>
+<tr><td class="rolename">QA Manager</td><td>Performs the final verification and releases the EBR (which then becomes immutable) or rejects it with an electronic signature.</td></tr>
+<tr><td class="rolename">Qualified Person (QP)</td><td>Certifies the release of batches for the EU market by electronic signature.</td></tr>
+</tbody></table></div></section>
+<section><h2>What this is not</h2><div class="limits">
+<p>This system has not been validated for GxP use. It ships with no computer system validation package, no installation, operational or performance qualification, no supplier audit, and no approval from any regulatory body. In a regulated environment, validation is the responsibility of the licence holder and is carried out against your own processes and your own risk assessment; it cannot be handed over with a piece of software. This is a starting point that implements documented rules — not a compliant system. Treat it as code you own and must qualify, not as a system you can put into production as delivered.</p>
+<p>The rules were drawn from 62 business rules examined, of which 34 were in scope and implemented. Those 34 come from cited US and EU sources: 6 US rules across 6 jurisdictional rules and 5 EU rules, sourced from eCFR, the EU Annex 11 text, GMP SOP references and industry writeups. This covers the release, deviation, CAPA and OOS flows described above and nothing beyond them. Anything outside these 34 rules — other GMP processes, other record types, other jurisdictions — is not in this code.</p>
+<p>The database layer uses Node&#x27;s built-in SQLite module, which is still marked experimental and prints a warning on every start. Fine for a reference implementation; you will likely want to swap it before production.</p>
+<p class="eyebrow">Known and accepted</p><ul class="accepted">
+<li><strong>A large part of the source code is written in Dutch. Function names, variables and comments are Dutch in 28 of the 50 source files outside the tests and in 16 of the 17 test files — including the authentication and server code (hashWachtwoord, verifieerWachtwoord, gebruiker). The user interface and the API are English.</strong> Expect to read and work in Dutch whenever you change this code. Accepted as a known limitation and reflected in the price: the single-project tier is 600 instead of 1,000. Everything runs and is tested; the rules and the tests behind them are unaffected.</li>
+</ul>
+</div></section>
+<section id="rests"><h2>What it rests on</h2><p class="lede">27 rules the system implements, quoted from the material they were taken from. Each one carries its reference and its source in the archive, next to the module, the check and the test that enforce it. The reference in grey is the identifier the code and tests use; it comes from a larger catalogue of rules, so the numbers are not consecutive.</p><div class="scroll"><table><thead><tr><th>#</th><th>Quoted from the source</th><th>Reference</th></tr></thead><tbody>
+<tr><td class="rid">1</td><td class="quote">“The printed name of the signer; The date and time when the signature was executed”</td><td class="rid">BR-01</td></tr>
+<tr><td class="rid">2</td><td class="quote">“secure, computer-generated, time-stamped audit trails to independently record the date and time of operator entries”</td><td class="rid">BR-02</td></tr>
+<tr><td class="rid">3</td><td class="quote">“For critical data entered manually, there should be an additional check on the accuracy of the data”</td><td class="rid">BR-06</td></tr>
+<tr><td class="rid">4</td><td class="quote">“the system should allow only Qualified Persons to certify the release of the batches”</td><td class="rid">BR-07</td></tr>
+<tr><td class="rid">5</td><td class="quote">“For change or deletion of GMP-relevant data the reason should be documented”</td><td class="rid">BR-08</td></tr>
+<tr><td class="rid">6</td><td class="quote">“Draft Record created, data being entered Production / QA”</td><td class="rid">BR-22</td></tr>
+<tr><td class="rid">7</td><td class="quote">“Approved (Released) Disposition = release; batch can ship QA head / QP”</td><td class="rid">BR-23</td></tr>
+<tr><td class="rid">8</td><td class="quote">“On Hold / Pending Held for an open deviation/OOS/investigation QA”</td><td class="rid">BR-24</td></tr>
+<tr><td class="rid">9</td><td class="quote">“Rejected Disposition = reject QA head / QP”</td><td class="rid">BR-25</td></tr>
+<tr><td class="rid">10</td><td class="quote">“a batch can&#x27;t be released while a linked OOS or deviation is open”</td><td class="rid">BR-26</td></tr>
+<tr><td class="rid">11</td><td class="quote">“Open → Under Investigation → CAPA Assigned → Closed”</td><td class="rid">BR-27</td></tr>
+<tr><td class="rid">12</td><td class="quote">“the obligation to initiate a CAPA, track it to verified closure, and confirm the effectiveness”</td><td class="rid">BR-28</td></tr>
+<tr><td class="rid">13</td><td class="quote">“Closure requires approval by a qualified QA reviewer, with an electronic signature that is 21 CFR Part 11 compliant”</td><td class="rid">BR-29</td></tr>
+<tr><td class="rid">14</td><td class="quote">“Triggers immediate batch quarantine and senior QA involvement”</td><td class="rid">BR-30</td></tr>
+<tr><td class="rid">15</td><td class="quote">“Phase I: lab investigation I calculation/instrument/dilution check”</td><td class="rid">BR-31</td></tr>
+<tr><td class="rid">16</td><td class="quote">“Hypothesis / retest authorised II QA-authorised retest plan”</td><td class="rid">BR-32</td></tr>
+<tr><td class="rid">17</td><td class="quote">“Status Open → Phase I → Phase II → Closed”</td><td class="rid">BR-33</td></tr>
+<tr><td class="rid">18</td><td class="quote">“The EBR is editable only while in Draft”</td><td class="rid">BR-34</td></tr>
+<tr><td class="rid">19</td><td class="quote">“The QA Manager performs the final verification and releases or rejects the EBR with an electronic signature”</td><td class="rid">BR-35</td></tr>
+<tr><td class="rid">20</td><td class="quote">“the Supervisor can cancel it, typically based on QA comments”</td><td class="rid">BR-36</td></tr>
+<tr><td class="rid">21</td><td class="quote">“should not release a batch until discrepancies are resolved or satisfactorily explained, deviations are investigated”</td><td class="rid">BR-37</td></tr>
+<tr><td class="rid">22</td><td class="quote">“it should not be released unless a justified decision is made”</td><td class="rid">BR-38</td></tr>
+<tr><td class="rid">23</td><td class="quote">“an explanation must be documented. If no explanation is provided, a deviation investigation must be initiated”</td><td class="rid">BR-51</td></tr>
+<tr><td class="rid">24</td><td class="quote">“Investigations must extend to other batches of formulated or packed product and API, as necessary”</td><td class="rid">BR-53</td></tr>
+<tr><td class="rid">25</td><td class="quote">“prevents final closure until the verification criteria — configured per CAPA type — are documented with objective evidence and approved”</td><td class="rid">BR-59</td></tr>
+<tr><td class="rid">26</td><td class="quote">“Can production release a batch if QA is backlogged? No. Independence is fundamental”</td><td class="rid">BR-60</td></tr>
+<tr><td class="rid">27</td><td class="quote">“Any correction to a released batch record requires a documented exception with QA approval”</td><td class="rid">BR-62</td></tr>
+</tbody></table></div>
+</section>
+<section id="price"><h2>Price</h2><p class="lede">Both tiers contain exactly the same code. The only difference is how often you may use it. Either way you sell what you build with it, not the code itself.</p><div class="tiers">
+<div class="tier"><p class="eyebrow">Single project</p><div class="amount">$600</div><p>Use this code in one system, for yourself or for one client.</p></div>
+<div class="tier"><p class="eyebrow">Unlimited</p><div class="amount">$1,500</div><p>Use it in as many systems as you like, for yourself or for clients.</p></div>
+</div>
+<p class="shortly"><strong>Checkout opens shortly.</strong> To buy now, or to ask anything first, write to <a href="mailto:groundworkcode@outlook.com">groundworkcode@outlook.com</a>.</p>
+<p class="note">You may not resell this as source code, in whole or in substantial part, modified or not. What you build with it is yours to sell. The full licence ships with the archive.</p></section>
+</div>
+<footer><div class="wrap">
+  <span>Pharma Batch Release &amp; Deviation Control (US/EU GMP)</span>
+  <span>Generated 2026-09-16 from the release record. <a href="../about/">About this shop</a></span>
+</div></footer>
+</body>
+</html>
